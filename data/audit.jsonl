@@ -1,0 +1,2 @@
+{"time":"2026-09-14T01:47:12.0725219+03:00","user":"DESKTOP-60094B8\\jood9","action":"rule.create","target":"Block firefox.exe (Outbound)","result":"ok","detail":{"displayName":"Block firefox.exe (Outbound)","description":"Created by Firewall++ quick action","group":"Firewall++","direction":"Outbound","action":"Block","profile":"Any","program":"C:\\Program Files\\Mozilla Firefox\\firefox.exe","enabled":true}}
+{"time":"2026-09-14T01:47:45.3018646+03:00","user":"DESKTOP-60094B8\\jood9","action":"rule.delete","target":"1 rule(s)","result":"ok","detail":{"ok":1,"errors":[]}}

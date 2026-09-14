@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firewall++ - Windows Firewall Console</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🛡️</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="shield">🛡</span>
+    <div>
+      <h1>Firewall++</h1>
+      <span class="sub" id="hostLabel">connecting…</span>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="rules">Rules</button>
+    <button data-tab="connections">Connections</button>
+    <button data-tab="log">Log</button>
+    <button data-tab="tools">Tools</button>
+  </nav>
+  <div class="topright">
+    <span id="modeBadge" class="badge badge-muted">…</span>
+    <button id="themeToggle" class="theme-btn" title="Toggle light/dark mode">🌙</button>
+    <button id="refreshBtn" class="btn btn-ghost" title="Reload everything">⟳</button>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================ DASHBOARD -->
+<section class="tabpane active" id="tab-dashboard">
+
+  <div class="profiles" id="profileCards"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Rule inventory</h2>
+      <div class="statgrid" id="statGrid"></div>
+      <div class="bars" id="statBars"></div>
+    </div>
+
+    <div class="card">
+      <h2>Quick actions</h2>
+      <div class="quick">
+        <label>Block a program
+          <div class="row">
+            <input id="qBlockApp" placeholder="C:\Path\To\app.exe" spellcheck="false">
+            <select id="qBlockDir">
+              <option value="Outbound">Outbound</option>
+              <option value="Inbound">Inbound</option>
+              <option value="Inbound,Outbound">Both</option>
+            </select>
+            <button class="btn btn-danger" data-quick="blockApp">Block</button>
+          </div>
+        </label>
+
+        <label>Allow a program
+          <div class="row">
+            <input id="qAllowApp" placeholder="C:\Path\To\app.exe" spellcheck="false">
+            <select id="qAllowDir">
+              <option value="Inbound">Inbound</option>
+              <option value="Outbound">Outbound</option>
+              <option value="Inbound,Outbound">Both</option>
+            </select>
+            <button class="btn btn-ok" data-quick="allowApp">Allow</button>
+          </div>
+        </label>
+
+        <label>Block a remote address
+          <div class="row">
+            <input id="qBlockIp" placeholder="203.0.113.5  or  10.0.0.0/8" spellcheck="false">
+            <button class="btn btn-danger" data-quick="blockIp">Block in + out</button>
+          </div>
+        </label>
+
+        <label>Open an inbound port
+          <div class="row">
+            <input id="qPort" placeholder="8080" style="max-width:110px">
+            <select id="qProto"><option>TCP</option><option>UDP</option></select>
+            <input id="qScope" placeholder="scope (LocalSubnet, IP, Any)" spellcheck="false">
+            <button class="btn btn-ok" data-quick="openPort">Open</button>
+          </div>
+        </label>
+
+        <div class="danger-zone">
+          <button class="btn btn-danger" data-quick="panic">🚨 Lock down everything</button>
+          <button class="btn btn-ghost" data-quick="restoreDefaults">Restore Windows defaults</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cardhead">
+      <h2>Security review</h2>
+      <div class="rowgap">
+        <span id="auditSummary" class="muted"></span>
+        <button id="auditRun" class="btn btn-ghost">Run review</button>
+      </div>
+    </div>
+    <div id="auditOut" class="auditlist"><p class="muted">Scans your rule set for wide-open inbound allows, exposed sensitive ports, edge-traversal rules, duplicates, and rules pointing at programs that no longer exist.</p></div>
+  </div>
+
+</section>
+
+<!-- ================================================================ RULES -->
+<section class="tabpane" id="tab-rules">
+
+  <div class="toolbar">
+    <input id="ruleSearch" class="search" placeholder="Search name, program, port, address, group…" spellcheck="false">
+    <select id="fDirection"><option value="">Any direction</option><option>Inbound</option><option>Outbound</option></select>
+    <select id="fAction"><option value="">Any action</option><option>Allow</option><option>Block</option></select>
+    <select id="fEnabled"><option value="">Enabled + disabled</option><option value="1">Enabled only</option><option value="0">Disabled only</option></select>
+    <select id="fProfile"><option value="">Any profile</option><option>Domain</option><option>Private</option><option>Public</option></select>
+    <select id="fGroup"><option value="">Any group</option></select>
+    <select id="fStore"><option value="local">Local rules</option><option value="active">Effective (incl. GPO)</option></select>
+    <button id="newRuleBtn" class="btn btn-primary">+ New rule</button>
+  </div>
+
+  <div class="bulkbar" id="bulkbar">
+    <span id="selCount">0 selected</span>
+    <button class="btn btn-sm" data-bulk="enable">Enable</button>
+    <button class="btn btn-sm" data-bulk="disable">Disable</button>
+    <button class="btn btn-sm" data-bulk="allow">Set Allow</button>
+    <button class="btn btn-sm" data-bulk="block">Set Block</button>
+    <button class="btn btn-sm btn-danger" data-bulk="delete">Delete</button>
+    <button class="btn btn-sm btn-ghost" id="selClear">Clear</button>
+  </div>
+
+  <div class="tablewrap">
+    <table class="grid" id="rulesTable">
+      <thead>
+        <tr>
+          <th class="c-check"><input type="checkbox" id="selAll"></th>
+          <th class="c-on">On</th>
+          <th data-sort="displayName">Name</th>
+          <th data-sort="direction" class="c-sm">Dir</th>
+          <th data-sort="action" class="c-sm">Action</th>
+          <th data-sort="protocol" class="c-sm">Proto</th>
+          <th data-sort="localPort">Local port</th>
+          <th data-sort="remotePort">Remote port</th>
+          <th data-sort="remoteAddress">Remote addr</th>
+          <th data-sort="program">Program</th>
+          <th data-sort="profile" class="c-sm">Profile</th>
+          <th class="c-sm"></th>
+        </tr>
+      </thead>
+      <tbody id="rulesBody"></tbody>
+    </table>
+  </div>
+  <div class="tablefoot"><span id="ruleCount" class="muted"></span></div>
+</section>
+
+<!-- ========================================================== CONNECTIONS -->
+<section class="tabpane" id="tab-connections">
+  <div class="toolbar">
+    <input id="connSearch" class="search" placeholder="Search process, address, port…" spellcheck="false">
+    <select id="connState">
+      <option value="">All states</option>
+      <option value="Established">Established</option>
+      <option value="Listen">Listening</option>
+    </select>
+    <select id="connProto"><option value="">TCP + UDP</option><option>TCP</option><option>UDP</option></select>
+    <label class="chk"><input type="checkbox" id="connAuto"> auto-refresh (5s)</label>
+    <button id="connRefresh" class="btn btn-ghost">Refresh</button>
+  </div>
+  <div class="tablewrap">
+    <table class="grid" id="connTable">
+      <thead><tr>
+        <th class="c-sm">Proto</th><th>Local</th><th>Remote</th><th class="c-sm">State</th>
+        <th class="c-sm">PID</th><th>Process</th><th>Path</th><th class="c-actions">Act on it</th>
+      </tr></thead>
+      <tbody id="connBody"></tbody>
+    </table>
+  </div>
+  <div class="tablefoot"><span id="connCount" class="muted"></span></div>
+</section>
+
+<!-- ================================================================== LOG -->
+<section class="tabpane" id="tab-log">
+  <div class="toolbar">
+    <input id="logFilter" class="search" placeholder="Filter raw log lines (IP, port, DROP…)" spellcheck="false">
+    <label class="chk"><input type="checkbox" id="logAuto"> auto-refresh (5s)</label>
+    <button id="logRefresh" class="btn btn-ghost">Refresh</button>
+    <button id="logEnable" class="btn btn-primary">Turn on dropped-packet logging</button>
+  </div>
+  <div id="logNotice"></div>
+  <div class="tablewrap">
+    <table class="grid" id="logTable">
+      <thead><tr>
+        <th class="c-sm">Time</th><th class="c-sm">Action</th><th class="c-sm">Proto</th>
+        <th>Source</th><th>Destination</th><th class="c-sm">Size</th><th>Path</th><th class="c-actions"></th>
+      </tr></thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
+  <div class="tablefoot"><span id="logCount" class="muted"></span></div>
+</section>
+
+<!-- ================================================================ TOOLS -->
+<section class="tabpane" id="tab-tools">
+  <div class="grid2">
+
+    <div class="card">
+      <h2>Connectivity simulator</h2>
+      <p class="muted">Ask what the current rule set would do with a packet, and see every rule that matches.</p>
+      <div class="form">
+        <label>Direction<select id="wDirection"><option>Outbound</option><option>Inbound</option></select></label>
+        <label>Profile<select id="wProfile"><option>Private</option><option>Public</option><option>Domain</option></select></label>
+        <label>Protocol<select id="wProtocol"><option>TCP</option><option>UDP</option></select></label>
+        <label>Port<input id="wPort" placeholder="443"></label>
+        <label>Remote address<input id="wAddress" placeholder="optional" spellcheck="false"></label>
+        <label>Program<input id="wProgram" placeholder="optional full path" spellcheck="false"></label>
+      </div>
+      <button id="wRun" class="btn btn-primary">Evaluate</button>
+      <div id="wOut"></div>
+    </div>
+
+    <div class="card">
+      <h2>Backup &amp; export</h2>
+      <p class="muted">A <code>.wfw</code> backup captures the entire policy and can be restored in one step.</p>
+      <div class="rowgap">
+        <button id="backupBtn" class="btn btn-primary">Create backup now</button>
+        <a class="btn btn-ghost" data-export="json">Export JSON</a>
+        <a class="btn btn-ghost" data-export="csv">Export CSV</a>
+        <a class="btn btn-ghost" data-export="ps1">Export PowerShell</a>
+      </div>
+      <h3>Restore points</h3>
+      <div id="backupList" class="backuplist"></div>
+    </div>
+
+  </div>
+
+  <div class="card">
+    <div class="cardhead">
+      <h2>Change history</h2>
+      <button id="histRefresh" class="btn btn-ghost">Refresh</button>
+    </div>
+    <p class="muted">Every change made through this console, oldest at the bottom.</p>
+    <div class="tablewrap">
+      <table class="grid" id="histTable">
+        <thead><tr><th class="c-sm">When</th><th>User</th><th>Action</th><th>Target</th><th class="c-sm">Result</th></tr></thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ========================================================= RULE EDITOR -->
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawerhead">
+    <h2 id="drawerTitle">Edit rule</h2>
+    <button class="btn btn-ghost" id="drawerClose">✕</button>
+  </div>
+  <div class="drawerbody">
+    <div id="drawerWarn"></div>
+    <label>Name<input id="eName"></label>
+    <label>Description<textarea id="eDesc" rows="2"></textarea></label>
+    <div class="form">
+      <label>Enabled<select id="eEnabled"><option value="true">Yes</option><option value="false">No</option></select></label>
+      <label>Direction<select id="eDirection"><option>Inbound</option><option>Outbound</option></select></label>
+      <label>Action<select id="eAction"><option>Allow</option><option>Block</option></select></label>
+      <label>Protocol<select id="eProtocol">
+        <option>Any</option><option>TCP</option><option>UDP</option><option>ICMPv4</option><option>ICMPv6</option>
+      </select></label>
+      <label>Local port<input id="eLocalPort" placeholder="Any, 80, 8000-8100, 80,443"></label>
+      <label>Remote port<input id="eRemotePort" placeholder="Any"></label>
+      <label>Local address<input id="eLocalAddress" placeholder="Any"></label>
+      <label>Remote address<input id="eRemoteAddress" placeholder="Any, LocalSubnet, 10.0.0.0/8"></label>
+      <label>Edge traversal<select id="eEdge">
+        <option>Block</option><option>Allow</option><option>DeferToUser</option><option>DeferToApp</option>
+      </select></label>
+      <label>Interface type<select id="eInterface">
+        <option>Any</option><option>Wired</option><option>Wireless</option><option>RemoteAccess</option>
+      </select></label>
+    </div>
+    <label>Program<input id="eProgram" placeholder="Any or C:\Path\app.exe" spellcheck="false"></label>
+    <label>Service<input id="eService" placeholder="Any or short service name" spellcheck="false"></label>
+    <label>Group<input id="eGroup" placeholder="optional grouping label" spellcheck="false"></label>
+    <fieldset class="profiles-pick">
+      <legend>Profiles</legend>
+      <label class="chk"><input type="checkbox" value="Domain" class="eProf"> Domain</label>
+      <label class="chk"><input type="checkbox" value="Private" class="eProf"> Private</label>
+      <label class="chk"><input type="checkbox" value="Public" class="eProf"> Public</label>
+    </fieldset>
+  </div>
+  <div class="drawerfoot">
+    <button id="eSave" class="btn btn-primary">Save</button>
+    <button id="eCancel" class="btn btn-ghost">Cancel</button>
+    <span class="spacer"></span>
+    <button id="eDelete" class="btn btn-danger">Delete rule</button>
+  </div>
+</aside>
+
+<div id="toasts"></div>
+
+<div class="confirm-backdrop" id="confirmBackdrop">
+  <div class="confirm">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmBody"></p>
+    <div class="confirm-actions">
+      <button id="confirmNo" class="btn btn-ghost">Cancel</button>
+      <button id="confirmYes" class="btn btn-danger">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
